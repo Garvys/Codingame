@@ -27,12 +27,21 @@ def printListDrones():
 # d: number of drones in each team (3 to 11)
 # z: number of zones on the map (4 to 8)
 p, id, d, z = [int(i) for i in input().split()]
+#Numero du tour actuel
+tour = 0
 #Variables Globales : END -----------------------------------------------------------------------------------------
 
 #Renvoi la distance euclidienne entre deux points
 def getDist(x1,y1,x2,y2):
-    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    return float(math.sqrt((x2 - x1)**2 + (y2 - y1)**2))
 
+#Fonction qui renvoit le nombre nécessaire pour un drone d'allé entre deux positions
+def getNbTurnNecessary(x1,y1,x2,y2):
+    return int(math.ceil(getDist(x1,y1,x2,y2) / 100))
+
+#Renvoi la liste des ID des drones du joeur passé en paramètre
+def getListDronesPlayer(playerID):
+    return [int(i) + playerID*d for i in range(d)]
 #Zone : BEGIN -----------------------------------------------------------------------------------------------------
 class Zone:
     #Classe qui repésente une zone
@@ -42,6 +51,7 @@ class Zone:
     # - ID : id de la zone (unique) => Démarre à 0
     # - ownerID :  ID of the team controlling the zone (0, 1, 2, or 3) or -1 if it is not controlled.
     # - listIDDroneInZone : list des id des drones dans la zone pour chaque joueur
+    # - risk : risque de la zone (int)
     
     #Incrementé a chaque nouelle zone crée
     nbZoneCreated = 0
@@ -54,10 +64,11 @@ class Zone:
         Zone.nbZoneCreated += 1
         self.ownerID = -1
         self.listIDDroneInZone = list()
+        self.risk = -1
         
     #Méthode pour générer un string de notre objet
     def __str__(self):
-        return "Zone: id = {}, x = {}, y = {}, ownerID = {}, nbDrones = {}".format(self.ID,self.x,self.y,self.ownerID,len(self.listIDDroneInZone))
+        return "Zone: id = {}, x = {}, y = {}, ownerID = {}, nbDrones = {}, risque = {}".format(self.ID,self.x,self.y,self.ownerID,len(self.listIDDroneInZone),self.risk)
         
     #Méthode pour attribuer le propriétaire à une zone
     def setOwner(self, ownerID):
@@ -87,10 +98,30 @@ class Zone:
                 counter += 1
         return counter
 
+    #Mise a jour du risque d'une zone (nb de tour nécessaire pour un adversaire pour prendre la zone)
+    def evaluateRisk(self):
+        nbDroneNecessary = self.getNbDroneInZone(self.ownerID) + 1
+        listRisk = list()
+        for player in listPlayers:
+            #Celui qui la controle ne nous interesse pas
+            if player.getID() != self.ownerID:
+                listTime = list()
+                nbDroneInZone = 0
+                for iddrone in player.getListDrones():
+                    if self.isDroneInZone(iddrone):
+                        nbDroneInZone += 1
+                    else:
+                        listTime.append(getNbTurnNecessary(self.x,self.y,listDrones[iddrone].getX(),listDrones[iddrone].getY()))
+                listTime.sort()
+                listRisk.append(max(listTime[:(nbDroneNecessary - nbDroneInZone)]))
+        if len(listRisk) > 0:
+            self.risk = min(listRisk)
+
     #Méthode qui s'occupe d'effacer ce qui doit l'être a chaque nouveau tour
     def clearNewTurn(self):
         del self.listIDDroneInZone[:]
         self.ownerID = -1
+        self.risk = -1
         
 #Zone : END ----------------------------------------------------------------------------------------------------------
 
@@ -131,6 +162,14 @@ class Player:
     #Renvoi le nombre de drone du joeur dans la zone voulue
     def getNbDroneInZone(self,IDZone):
         return len(self.listIDDroneByZone[IDZone])
+
+    #Renvoi l'ID du joueur
+    def getID(self):
+        return self.ID
+
+    #Renvoi la liste des drones que possède le joueur
+    def getListDrones(self):
+        return list(self.listIDDroneControlled)
         
     #Méthode qui s'occupe d'effacer ce qui doit l'être a chaque nouveau tour
     def clearNewTurn(self):
@@ -150,6 +189,8 @@ class Drone:
     # - y : position en y du drone
     # - ownerID : id du joueur qui le controlle
     # - zoneID : id de la zone dans la quelle se trouve le drone. -1 is aucune
+    # - currentMission : mission du drone
+    # - missionAccomplished : mission du drone accomplie
     
     #Nombre de drone crée
     nbDroneCreated = 0
@@ -162,6 +203,7 @@ class Drone:
         self.y = -1
         self.ownerID = -1
         self.zoneID = -1
+        self.missionAccomplished = True
     
     #Mise a jour de la position du drone
     def updatePosDrone(self,x,y):
@@ -170,6 +212,9 @@ class Drone:
         self.zoneID = -1
         self.analysePos()
         self.informPlayer()
+        if tour > 1:
+            self.currentMission.checkMissionAccomplished()
+            self.missionAccomplished = self.currentMission.isMissionAccomplished()
         
     def addOwner(self, ownerID):
         self.ownerID = ownerID
@@ -187,6 +232,11 @@ class Drone:
         if self.zoneID != -1:
             listPlayers[self.ID // d].addDroneInZone(self.ID,self.zoneID)
 
+    #Nouvelle mission pour le drone
+    def setNewMission(self, IDZoneWanted):
+        self.currentMission = Mission(self.ID,IDZoneWanted)
+        self.missionAccomplished = self.currentMission.isMissionAccomplished()
+
     #Renvoi la position en X du drone
     def getX(self):
         return self.x
@@ -194,12 +244,50 @@ class Drone:
     #Renvoi la position en Y du drone
     def getY(self):
         return self.y
+
+    #Affiche l'objectif du drone
+    def printObj(self):
+        self.currentMission.printObj()
         
     #Méthode qui s'occupe d'effacer ce qui doit l'être a chaque nouveau tour
     def clearNewTurn(self):
         self.x = -1
         self.y = -1
 #Drone : END ----------------------------------------------------------------------------------------------------------
+
+#Mission : BEGIN -------------------------------------------------------------------------------------------------------
+class Mission:
+    #classe représentant une mission a effectuer par un drone
+    #Attributs:
+    # - IDZoneWanted : objectif de la mission => id de la zone a prendre ou a renforcer
+    # - accomplished : booleen pour savoir si la mission est accomplie
+    # - IDDrone : id du drone associé à la mission
+
+    #Création d'une mission
+    def __init__(self, IDDrone, IDZoneWanted):
+        self.IDZoneWanted = IDZoneWanted
+        self.accomplished = False
+        self.checkMissionAccomplished()
+        self.IDDrone = IDDrone
+
+    #Vérifie si la mission a été accomplie
+    def checkMissionAccomplished(self):
+        self.accomplished = listZones[self.IDZoneWanted].isDroneInZone(self.IDDrone)
+
+    #Renvoi un booléen pour savoir si la mission a été accomplie
+    def isMissionAccomplished(self):
+        return self.accomplished
+
+    #Nouvel objectif pour la mission
+    def setNewObj(self,IDZoneWanted):
+        self.IDZoneWanted = IDZoneWanted
+        self.checkMissionAccomplished()
+
+    #Affichage de l'objectif
+    def printObj(self):
+        print(listZones[self.IDZoneWanted].getX(), listZones[self.IDZoneWanted].getY())
+
+#Mission : END ---------------------------------------------------------------------------------------------------------
 
 #Récupération des coordonnées des zones
 for i in range(z):
@@ -239,12 +327,19 @@ def updateListNewTurn():
             #Chaque drone est controlée par un joueur        
             listPlayers[i].addDroneControlled(idDroneCour)
             listDrones[idDroneCour].addOwner(i)
+
+    #Calcul de la faiblesse de chaque zone
+    for zone in listZones:
+        zone.evaluateRisk()
             
 # game loop
 while True:
+    tour += 1
     #Mise a jour des valeurs des classes
     updateListNewTurn()
-   
+    printListZones()
+
+
     #Sortie : nouvelle position désirée des drones   
     for i in range(d):
         print(xzone,yzone)
