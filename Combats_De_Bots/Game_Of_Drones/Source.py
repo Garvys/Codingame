@@ -42,6 +42,7 @@ def getNbTurnNecessary(x1,y1,x2,y2):
 #Renvoi la liste des ID des drones du joeur passé en paramètre
 def getListDronesPlayer(playerID):
     return [int(i) + playerID*d for i in range(d)]
+
 #Zone : BEGIN -----------------------------------------------------------------------------------------------------
 class Zone:
     #Classe qui repésente une zone
@@ -52,6 +53,7 @@ class Zone:
     # - ownerID :  ID of the team controlling the zone (0, 1, 2, or 3) or -1 if it is not controlled.
     # - listIDDroneInZone : list des id des drones dans la zone pour chaque joueur
     # - risk : risque de la zone (int)
+    # - riskAgainstMe : tempts nécessaire pour que je prenne la zone
     
     #Incrementé a chaque nouelle zone crée
     nbZoneCreated = 0
@@ -65,6 +67,7 @@ class Zone:
         self.ownerID = -1
         self.listIDDroneInZone = list()
         self.risk = -1
+        self.riskAgainstMe = -1
         
     #Méthode pour générer un string de notre objet
     def __str__(self):
@@ -103,6 +106,8 @@ class Zone:
         nbDroneNecessary = self.getNbDroneInZone(self.ownerID) + 1
         listRisk = list()
         for player in listPlayers:
+            if self.ownerID == id:
+                self.riskAgainstMe = 0
             #Celui qui la controle ne nous interesse pas
             if player.getID() != self.ownerID:
                 listTime = list()
@@ -114,6 +119,8 @@ class Zone:
                         listTime.append(getNbTurnNecessary(self.x,self.y,listDrones[iddrone].getX(),listDrones[iddrone].getY()))
                 listTime.sort()
                 listRisk.append(max(listTime[:(nbDroneNecessary - nbDroneInZone)]))
+                if player.getID() == id:
+                    self.riskAgainstMe = listRisk[-1]
         if len(listRisk) > 0:
             self.risk = min(listRisk)
 
@@ -122,6 +129,7 @@ class Zone:
         del self.listIDDroneInZone[:]
         self.ownerID = -1
         self.risk = -1
+        self.riskAgainstMe = -1
         
 #Zone : END ----------------------------------------------------------------------------------------------------------
 
