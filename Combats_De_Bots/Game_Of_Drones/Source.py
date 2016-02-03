@@ -80,6 +80,12 @@ class Zone:
     #Retourne l'ID de la zone
     def getZoneID(self):
         return self.ID
+        
+    def getX(self):
+        return self.x
+        
+    def getY(self):
+        return self.y
 
     #Détermine si le zone dont l'id est passé en paramètre se situe dans la zone
     #Renvoi un booleen
@@ -100,6 +106,10 @@ class Zone:
             if e >= IDmin and e <= IDmax:
                 counter += 1
         return counter
+
+    #Récupération des ids des drones dans la zone
+    def getListIdDroneInZone(self):
+        return list(self.listIDDroneInZone)
 
     #Mise a jour du risque d'une zone (nb de tour nécessaire pour un adversaire pour prendre la zone)
     def evaluateRisk(self):
@@ -123,6 +133,10 @@ class Zone:
                     self.riskAgainstMe = listRisk[-1]
         if len(listRisk) > 0:
             self.risk = min(listRisk)
+
+    #Renvoi vrai si la zone est neutre
+    def isNeutral(self):
+        return self.ownerID == -1
 
     #Méthode qui s'occupe d'effacer ce qui doit l'être a chaque nouveau tour
     def clearNewTurn(self):
@@ -199,6 +213,7 @@ class Drone:
     # - zoneID : id de la zone dans la quelle se trouve le drone. -1 is aucune
     # - currentMission : mission du drone
     # - missionAccomplished : mission du drone accomplie
+    # - untouchable : booleen => drone nécessaire pour garder la zone
     
     #Nombre de drone crée
     nbDroneCreated = 0
@@ -212,6 +227,8 @@ class Drone:
         self.ownerID = -1
         self.zoneID = -1
         self.missionAccomplished = True
+        self.untouchable = False
+        self.currentMission = 0
     
     #Mise a jour de la position du drone
     def updatePosDrone(self,x,y):
@@ -220,10 +237,11 @@ class Drone:
         self.zoneID = -1
         self.analysePos()
         self.informPlayer()
-        if tour > 1:
+        if tour > 2:
             self.currentMission.checkMissionAccomplished()
             self.missionAccomplished = self.currentMission.isMissionAccomplished()
         
+    #Ajout d'un propriétaire pour le drone
     def addOwner(self, ownerID):
         self.ownerID = ownerID
 
@@ -244,10 +262,15 @@ class Drone:
     def setNewMission(self, IDZoneWanted):
         self.currentMission = Mission(self.ID,IDZoneWanted)
         self.missionAccomplished = self.currentMission.isMissionAccomplished()
+        self.untouchable = not self.missionAccomplished
 
     #Renvoi la position en X du drone
     def getX(self):
         return self.x
+
+    #Renvoi le propriétaire du drone
+    def getOwnerID(self):
+        return self.ownerID
 
     #Renvoi la position en Y du drone
     def getY(self):
@@ -256,6 +279,26 @@ class Drone:
     #Affiche l'objectif du drone
     def printObj(self):
         self.currentMission.printObj()
+
+    #Méthode pour savoir si un drone est touchable
+    def isUntouchable(self):
+        return self.untouchable
+
+    #Vérifie si le Drone est indispensable dans la zone où is se trouve
+    def checkDroneTouchable(self):
+        if self.zoneID == -1:
+            self.untouchable = False
+            return
+        bestOpponent = max([listZones[self.zoneID].getNbDroneInZone(i) for i in range(p) if i != self.ownerID])
+        nbDroneUseless = listZones[self.zoneID].getNbDroneInZone(self.ownerID) - bestOpponent - 1
+        IDmin = self.ownerID*d
+        IDmax = IDmin + d - 1
+        lDrone = listZones[self.zoneID].getListIdDroneInZone()
+        lDrone.sort()
+        self.untouchable =  not (self.ID in lDrone[:nbDroneUseless])
+
+
+
         
     #Méthode qui s'occupe d'effacer ce qui doit l'être a chaque nouveau tour
     def clearNewTurn(self):
@@ -275,8 +318,9 @@ class Mission:
     def __init__(self, IDDrone, IDZoneWanted):
         self.IDZoneWanted = IDZoneWanted
         self.accomplished = False
-        self.checkMissionAccomplished()
         self.IDDrone = IDDrone
+        self.checkMissionAccomplished()
+       
 
     #Vérifie si la mission a été accomplie
     def checkMissionAccomplished(self):
@@ -339,18 +383,42 @@ def updateListNewTurn():
     #Calcul de la faiblesse de chaque zone
     for zone in listZones:
         zone.evaluateRisk()
-            
+
+    #On regarde si un drone est indispensable pour tenir sa zone
+    for drone in listDrones:
+        drone.checkDroneTouchable()
+
+#Renvoi le prochain drone disponible. -1 si aucun
+def getNextUselessDroneAndClosest(listD, zoneID):
+    for iddrone in listD:
+        if not listDrones[iddrone].isUntouchable():
+            return iddrone
+    return -1
+
+myDrones = getListDronesPlayer(id)
+
 # game loop
 while True:
     tour += 1
+    print("Tour numero : {}".format(tour), file=sys.stderr)
     #Mise a jour des valeurs des classes
     updateListNewTurn()
-    printListZones()
+    if tour == 1:
+        for drone in myDrones:
+            listDrones[drone].setNewMission(listZones[0].getZoneID())
 
+    #IA => Donner une mission a chaque drone
+    
+
+    #Zone neutre => attack
+    for zoneNeutre in [z for z in listZones if z.isNeutral()]:
+        idDroneUseless = getNextUselessDroneAndClosest(myDrones, zoneNeutre)
+        if idDroneUseless != -1:
+            listDrones[idDroneUseless].setNewMission(zoneNeutre.getZoneID())
 
     #Sortie : nouvelle position désirée des drones   
-    for i in range(d):
-        print(xzone,yzone)
+    for drone in myDrones:
+        listDrones[drone].printObj()
     
 
  # To debug: print("Debug messages...", file=sys.stderr)
