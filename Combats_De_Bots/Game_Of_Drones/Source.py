@@ -228,7 +228,8 @@ class Drone:
         self.zoneID = -1
         self.missionAccomplished = True
         self.untouchable = False
-        self.currentMission = 0
+        self.currentMission = Mission(-1,-1)
+        self.currentMission.accomplished = True
     
     #Mise a jour de la position du drone
     def updatePosDrone(self,x,y):
@@ -237,7 +238,7 @@ class Drone:
         self.zoneID = -1
         self.analysePos()
         self.informPlayer()
-        if tour > 2:
+        if tour > 1:
             self.currentMission.checkMissionAccomplished()
             self.missionAccomplished = self.currentMission.isMissionAccomplished()
         
@@ -319,12 +320,20 @@ class Mission:
         self.IDZoneWanted = IDZoneWanted
         self.accomplished = False
         self.IDDrone = IDDrone
-        self.checkMissionAccomplished()
-       
+        self.checkMissionAccomplished()  
+
+    #Vérifie si la mission a été définie correctement
+    def isMissionDefined(self):
+        if self.IDDrone == -1 or self.IDZoneWanted == -1:
+            print("Mission non définie", file=sys.stderr)
+            return False
+        else:
+            return True
 
     #Vérifie si la mission a été accomplie
     def checkMissionAccomplished(self):
-        self.accomplished = listZones[self.IDZoneWanted].isDroneInZone(self.IDDrone)
+        if self.isMissionDefined():
+            self.accomplished = listZones[self.IDZoneWanted].isDroneInZone(self.IDDrone)
 
     #Renvoi un booléen pour savoir si la mission a été accomplie
     def isMissionAccomplished(self):
@@ -337,7 +346,8 @@ class Mission:
 
     #Affichage de l'objectif
     def printObj(self):
-        print(listZones[self.IDZoneWanted].getX(), listZones[self.IDZoneWanted].getY())
+        if self.isMissionDefined():
+            print(listZones[self.IDZoneWanted].getX(), listZones[self.IDZoneWanted].getY())
 
 #Mission : END ---------------------------------------------------------------------------------------------------------
 
