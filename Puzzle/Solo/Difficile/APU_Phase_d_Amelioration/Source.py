@@ -1,24 +1,32 @@
 import sys
 import math
+import copy
 
 width = int(input())
 height = int(input())
-dictNumToPoint = dict()
-dictPointToNum = dict()
+
+class Grid:
+
+	def __init__(self,dictP2N,dictN2P):
+		self.dictP2N = copy.deepcopy(dictP2N)
+		self.dictN2P = copy.dictcopy(dictN2P)
+
+dictNumToPointInit = dict()
+dictPointToNumInit = dict()
 cells = list()
 
 def hashPoint(p):
 	return int(p[0]*(height+2) + p[1])
 	
 for i in range(9):
-	dictNumToPoint[i] = list()
+	dictNumToPointInit[i] = list()
 
 for i in range(height):
 	line = str(input())
 	for j,c in enumerate(line):
 		if c.isdigit():
-			dictNumToPoint[int(c)].append([i,j])
-			dictPointToNum[hashPoint([i,j])] = int(c)
+			dictNumToPointInit[int(c)].append([i,j])
+			dictPointToNumInit[hashPoint([i,j])] = int(c)
 			cells.append([i,j])
 	
 def isOnGrid(p):
@@ -51,43 +59,40 @@ def getVoisin(p):
 	getVoisinInDir(i,j,0,-1,l)
 	return l
 
-def decreaseNumberNode(p):
-	c = dictPointToNum[hashPoint(p)]
-	print(dictNumToPoint,file=sys.stderr)
+def decreaseNumberNode(p,g):
+	c = g.dictP2N[hashPoint(p)]
+	print(g.dictN2P,file=sys.stderr)
 	print(p,file=sys.stderr)
 	print(c,file=sys.stderr)
-	dictNumToPoint[c].remove(p)
-	dictNumToPoint[c-1].append(p)
-	dictPointToNum[hashPoint(p)] -= 1
+	g.dictN2P[c].remove(p)
+	g.dictN2P[c-1].append(p)
+	g.dictP2N[hashPoint(p)] -= 1
 
-def addLink(p1,p2):
-	decreaseNumberNode(p1)
-	decreaseNumberNode(p2)
+def addLink(p1,p2,g):
+	decreaseNumberNode(p1,g)
+	decreaseNumberNode(p2,g)
 	print("{} {} {} {} 1".format(p1[1],p1[0],p2[1],p2[0]))
 
 
 
 
 #Cas trivial si c(p) = sum(c[voisin])
-def lol():
-	for cell in [p for p in cells if dictPointToNum[hashPoint(p)] > 0]:
+def solveTrivialLink(g):
+	for cell in [p for p in cells if g.dictP2N[hashPoint(p)] > 0]:
 		listVoisin = getVoisin(cell)
-		if dictPointToNum[hashPoint(cell)] == sum([min(dictPointToNum[hashPoint(p)],2) for p in listVoisin]):
+		if g.dictP2N[hashPoint(cell)] == sum([min(g.dictP2N[hashPoint(p)],2) for p in listVoisin]):
 			for voisin in listVoisin:
-				for oo in range(min(2,dictPointToNum[hashPoint(voisin)])):
-					addLink(cell,voisin)
+				for oo in range(min(2,g.dictP2N[hashPoint(voisin)])):
+					addLink(cell,voisin,g)
 
-def lol2():
-	for cell in dictNumToPoint[1]:
-		listVoisinPositiv = [ p for p in getVoisin(cell) if dictPointToNum[hashPoint(p)] > 0]
+def solve1Link(g):
+	for cell in g.dictN2P[1]:
+		listVoisinPositiv = [ p for p in getVoisin(cell) if g.dictP2N[hashPoint(p)] > 0]
 		if len(listVoisinPositiv) == 1:
-			addLink(cell,listVoisinPositiv[0])
+			addLink(cell,listVoisinPositiv[0],g)
 
-print(getVoisin([1,3]),file=sys.stderr)
+grid = Grid(dictPointToNumInit,dictNumToPointInit)
+
 for ll in range(10):
-	lol()
-	lol2()
-
-for i in range(height):
-	for j in range(width):
-		print(i,j,":",hashPoint([i,j]),file=sys.stderr)
+	solveTrivialLink(grid)
+	solve1Link(grid)
