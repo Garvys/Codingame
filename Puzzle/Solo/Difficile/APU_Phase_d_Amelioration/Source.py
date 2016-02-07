@@ -9,7 +9,7 @@ class Grid:
 
 	def __init__(self,dictP2N,dictN2P):
 		self.dictP2N = copy.deepcopy(dictP2N)
-		self.dictN2P = copy.dictcopy(dictN2P)
+		self.dictN2P = copy.deepcopy(dictN2P)
 
 dictNumToPointInit = dict()
 dictPointToNumInit = dict()
@@ -73,12 +73,13 @@ def addLink(p1,p2,g):
 	decreaseNumberNode(p2,g)
 	print("{} {} {} {} 1".format(p1[1],p1[0],p2[1],p2[0]))
 
-
+def getCellPos(g):
+	return [p for p in cells if g.dictP2N[hashPoint(p)] > 0]
 
 
 #Cas trivial si c(p) = sum(c[voisin])
 def solveTrivialLink(g):
-	for cell in [p for p in cells if g.dictP2N[hashPoint(p)] > 0]:
+	for cell in getCellPos(g):
 		listVoisin = getVoisin(cell)
 		if g.dictP2N[hashPoint(cell)] == sum([min(g.dictP2N[hashPoint(p)],2) for p in listVoisin]):
 			for voisin in listVoisin:
@@ -92,6 +93,15 @@ def solve1Link(g):
 			addLink(cell,listVoisinPositiv[0],g)
 
 grid = Grid(dictPointToNumInit,dictNumToPointInit)
+
+for ll in range(10):
+	solveTrivialLink(grid)
+	solve1Link(grid)
+
+for cell in getCellPos(grid):
+	listVoisinPositiv = [p for p in getVoisin(cell) if grid.dictP2N[hashPoint(p)] > 0]
+	if grid.dictP2N[hashPoint(cell)] == 1 and len(listVoisinPositiv) == 2:
+		addLink(cell,listVoisinPositiv[0],grid)
 
 for ll in range(10):
 	solveTrivialLink(grid)
