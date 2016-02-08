@@ -5,12 +5,6 @@ import copy
 width = int(input())
 height = int(input())
 
-class Grid:
-
-	def __init__(self,dictP2N,dictN2P):
-		self.dictP2N = copy.deepcopy(dictP2N)
-		self.dictN2P = copy.deepcopy(dictN2P)
-
 dictNumToPointInit = dict()
 dictPointToNumInit = dict()
 cells = list()
@@ -59,50 +53,83 @@ def getVoisin(p):
 	getVoisinInDir(i,j,0,-1,l)
 	return l
 
-def decreaseNumberNode(p,g):
-	c = g.dictP2N[hashPoint(p)]
-	print(g.dictN2P,file=sys.stderr)
-	print(p,file=sys.stderr)
-	print(c,file=sys.stderr)
-	g.dictN2P[c].remove(p)
-	g.dictN2P[c-1].append(p)
-	g.dictP2N[hashPoint(p)] -= 1
+class Grid:
+	# dictP2N : dictionnaire qui a un point associe le nombre de lien nécessaire
+	# dictN2P : dictionnaire qui a un nombre de lien nécessaire associe une liste de point
+	# listStrings : liste de strings qui seront a afficher à la fin du programme
 
-def addLink(p1,p2,g):
-	decreaseNumberNode(p1,g)
-	decreaseNumberNode(p2,g)
-	print("{} {} {} {} 1".format(p1[1],p1[0],p2[1],p2[0]))
+	def __init__(self,dictP2N,dictN2P):
+		self.dictP2N = copy.deepcopy(dictP2N)
+		self.dictN2P = copy.deepcopy(dictN2P)
+		self.listStrings = list()
 
-def getCellPos(g):
-	return [p for p in cells if g.dictP2N[hashPoint(p)] > 0]
+	# Solve la grille
+	def solve(self):
+		while self.solveTrivialLink() > 0:
+		    a = 0
+		if self.isSolved():
+			return 
+		self.solveBySplit()
+
+	def solveBySplit(self):
+		for cell in self.dictN2P[1]:
+			listVoisinPositiv = [p for p in getVoisin(cell) if self.dictP2N[hashPoint(p)] > 0]
+			for i in range(len(listVoisinPositiv)):
+				grid = Grid(self.dictP2N,self.dictN2P)
+				grid.addLink(cell,listVoisinPositiv[i])
+				grid.solve()
+				if grid.isSolved():
+					self.dictP2N = copy.deepcopy(grid.dictP2N)
+					self.dictN2P = copy.deepcopy(grid.dictN2P)
+					self.listStrings.extend(grid.listStrings)
+					return
+
+	#Affiche sur la sortie standard les liens a ajouter pour solver la grille
+	def printLinksToAdd(self):
+		for s in self.listStrings:
+			print(s)
+
+	def isSolved(self):
+		return len(cells) == len(self.dictN2P[0])
+
+	def decreaseNumberNode(self,p):
+		c = self.dictP2N[hashPoint(p)]
+		print(self.dictN2P,file=sys.stderr)
+		print(p,file=sys.stderr)
+		print(c,file=sys.stderr)
+		self.dictN2P[c].remove(p)
+		self.dictN2P[c-1].append(p)
+		self.dictP2N[hashPoint(p)] -= 1
+
+	def addLink(self,p1,p2):
+		self.decreaseNumberNode(p1)
+		self.decreaseNumberNode(p2)
+		self.listStrings.append("{} {} {} {} 1".format(p1[1],p1[0],p2[1],p2[0]))
+
+	def getCellPos(self):
+		return [p for p in cells if self.dictP2N[hashPoint(p)] > 0]
 
 
-#Cas trivial si c(p) = sum(c[voisin])
-def solveTrivialLink(g):
-	for cell in getCellPos(g):
-		listVoisin = getVoisin(cell)
-		if g.dictP2N[hashPoint(cell)] == sum([min(g.dictP2N[hashPoint(p)],2) for p in listVoisin]):
-			for voisin in listVoisin:
-				for oo in range(min(2,g.dictP2N[hashPoint(voisin)])):
-					addLink(cell,voisin,g)
+	#Cas trivial si c(p) = sum(c[voisin])
+	#Renvoi le nombre de lien ajouté
+	def solveTrivialLink(self):
+		numAdded = 0
+		for cell in self.getCellPos():
+			listVoisin = getVoisin(cell)
+			if self.dictP2N[hashPoint(cell)] == sum([min(self.dictP2N[hashPoint(p)],2) for p in listVoisin]):
+				for voisin in listVoisin:
+					for oo in range(min(2,self.dictP2N[hashPoint(voisin)])):
+						self.addLink(cell,voisin)
+						numAdded += 1
+		for cell in self.dictN2P[1]:
+			listVoisinPositiv = [ p for p in getVoisin(cell) if self.dictP2N[hashPoint(p)] > 0]
+			if len(listVoisinPositiv) == 1:
+				self.addLink(cell,listVoisinPositiv[0])
+				numAdded += 1
+		return numAdded
 
-def solve1Link(g):
-	for cell in g.dictN2P[1]:
-		listVoisinPositiv = [ p for p in getVoisin(cell) if g.dictP2N[hashPoint(p)] > 0]
-		if len(listVoisinPositiv) == 1:
-			addLink(cell,listVoisinPositiv[0],g)
 
 grid = Grid(dictPointToNumInit,dictNumToPointInit)
 
-for ll in range(10):
-	solveTrivialLink(grid)
-	solve1Link(grid)
-
-for cell in getCellPos(grid):
-	listVoisinPositiv = [p for p in getVoisin(cell) if grid.dictP2N[hashPoint(p)] > 0]
-	if grid.dictP2N[hashPoint(cell)] == 1 and len(listVoisinPositiv) == 2:
-		addLink(cell,listVoisinPositiv[0],grid)
-
-for ll in range(10):
-	solveTrivialLink(grid)
-	solve1Link(grid)
+grid.solve()
+grid.printLinksToAdd()
