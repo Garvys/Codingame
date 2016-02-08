@@ -78,26 +78,58 @@ class Grid:
 		self.solveBySplit()
 
 	def solveBySplit(self):
-		for cell in self.dictN2P[1]:
-			listVoisinPositiv = [p for p in getVoisin(cell) if self.dictP2N[hashPoint(p)] > 0]
-			for i in range(len(listVoisinPositiv)):
-				if self.isLinkAddable(cell,listVoisinPositiv[i]):
-					grid = Grid(self.dictP2N,self.dictN2P,self.dictLinks)
-					grid.addLink(cell,listVoisinPositiv[i])
-					grid.solve()
-					if grid.isSolved():
-						self.dictP2N = copy.deepcopy(grid.dictP2N)
-						self.dictN2P = copy.deepcopy(grid.dictN2P)
-						self.listStrings.extend(grid.listStrings)
-						return
+
+		for alpha in range(1,9):
+			for cell in self.dictN2P[alpha]:
+				listVoisinPositiv = [p for p in getVoisin(cell) if self.dictP2N[hashPoint(p)] > 0]
+				for i in range(len(listVoisinPositiv)):
+					if self.isLinkAddable(cell,listVoisinPositiv[i]):
+						grid = Grid(self.dictP2N,self.dictN2P,self.dictLinks)
+						grid.addLink(cell,listVoisinPositiv[i])
+						if grid.isUnsolvable():
+							continue
+						grid.solve()
+						if grid.isSolved():
+							self.dictP2N = copy.deepcopy(grid.dictP2N)
+							self.dictN2P = copy.deepcopy(grid.dictN2P)
+							self.dictLinks = copy.deepcopy(grid.dictLinks)
+							self.listStrings.extend(grid.listStrings)
+							return
+
+	def isUnsolvable(self):
+		for cell in self.getCellPos():
+
+			if self.dictP2N[hashPoint(cell)] > sum([min(self.dictP2N[hashPoint(p)],2 - self.dictLinks[hashPoint(cell)].count(p)) for p in getVoisin(cell)]):
+				return True
+		return False
 
 	#Affiche sur la sortie standard les liens a ajouter pour solver la grille
 	def printLinksToAdd(self):
 		for s in self.listStrings:
 			print(s)
 
+	def findCellsRecurs(self,cellFrom,cellCour,mySet,cellsVisited):
+		cellsVisited[hashPoint(cellCour)] = True
+		#print(hashPoint(cellCour),file=sys.stderr)
+		for oo in self.dictLinks[hashPoint(cellCour)]:
+			mySet.update(oo)
+		for cellNext in self.dictLinks[hashPoint(cellCour)]:
+			if not cellsVisited[hashPoint(cellNext)]:
+				self.findCellsRecurs(cellCour,cellNext,mySet,cellsVisited)
+
+	#Verifie si on a un graphe connecté
+	def isValid(self):
+		cellFirst = cells[0]
+		setCellsFound = set()
+		setCellsFound.update(cellFirst)
+		cellsVisited = dict()
+		for cell in cells:
+			cellsVisited[hashPoint(cell)] = False
+		self.findCellsRecurs([-1,-1],cellFirst,setCellsFound,cellsVisited)
+		return len(setCellsFound) == len(cells)
+
 	def isSolved(self):
-		return len(cells) == len(self.dictN2P[0])
+		return len(cells) == len(self.dictN2P[0]) and self.isValid()
 
 	def decreaseNumberNode(self,p):
 		c = self.dictP2N[hashPoint(p)]
@@ -116,7 +148,7 @@ class Grid:
 		self.listStrings.append("{} {} {} {} 1".format(p1[1],p1[0],p2[1],p2[0]))
 
 	def isLinkAddable(self,p1,p2):
-		print("Test add link between",p1,"and",p2,file=sys.stderr)
+		#print("Test add link between",p1,"and",p2,file=sys.stderr)
 		if p1[0] == p2[0]: #Meme ligne
 			colMin = min(p1[1],p2[1])+1
 			colMax = max(p1[1],p2[1])
@@ -151,10 +183,10 @@ class Grid:
 		numAdded = 0
 		for cell in self.getCellPos():
 			listVoisin = getVoisin(cell)
-			if self.dictP2N[hashPoint(cell)] == sum([min(self.dictP2N[hashPoint(p)],2) for p in listVoisin]):
+			if self.dictP2N[hashPoint(cell)] == sum([min(self.dictP2N[hashPoint(p)],2 - self.dictLinks[hashPoint(cell)].count(p)) for p in listVoisin]):
 				for voisin in listVoisin:
 					if self.isLinkAddable(cell,voisin):
-						for oo in range(min(2,self.dictP2N[hashPoint(voisin)])):
+						for oo in range(min(2 - self.dictLinks[hashPoint(cell)].count(voisin),self.dictP2N[hashPoint(voisin)])):
 							self.addLink(cell,voisin)
 							numAdded += 1
 		for cell in self.dictN2P[1]:
